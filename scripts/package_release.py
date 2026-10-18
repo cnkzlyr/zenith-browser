@@ -17,7 +17,7 @@ import argparse
 SNAPSHOT_BASE = "https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o"
 
 PLATFORM_MAP = {
-    "android": ("Android", "chrome-android.zip"),
+    "android": ("Android_Arm64", "chrome-android.zip"),
     "linux": ("Linux_x64", "chrome-linux.zip"),
     "win": ("Win_x64", "chrome-win.zip"),
     "mac": ("Mac", "chrome-mac.zip"),
@@ -62,7 +62,7 @@ def package_android(build_num, out_dir):
     download_file(zip_url, temp_zip)
 
     print("[*] Extracting ChromePublic.apk...")
-    apk_out = os.path.join(out_dir, f"ZenithBrowser-Android-{build_num}.apk")
+    apk_out = os.path.join(out_dir, f"ZenithBrowser-Android-arm64-{build_num}.apk")
     with zipfile.ZipFile(temp_zip, "r") as z:
         for name in z.namelist():
             if name.endswith("ChromePublic.apk"):
