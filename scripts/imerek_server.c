@@ -8,6 +8,11 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <android/log.h>
+
+#define TAG "ZenithImerek"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
 #define SERVER_PORT 9936
 #define BUFFER_SIZE 65536
@@ -46,6 +51,8 @@ static void handle_client(int client_fd) {
         return;
     }
 
+    LOGI("Request: %s %s", method, path);
+
     // Handle OPTIONS (CORS preflight)
     if (strcmp(method, "OPTIONS") == 0) {
         send_cors_response(client_fd, 204, "No Content", "text/plain", "");
@@ -81,7 +88,6 @@ static void handle_client(int client_fd) {
             const char* resp = "{\"success\":true,\"calisan\":{\"kullaniciAdi\":\"admin\",\"ad\":\"Avukat\",\"rol\":\"ADMIN\"}}";
             send_cors_response(client_fd, 200, "OK", "application/json", resp);
         } else if (strstr(path, "/SQL/") != NULL || strstr(path, "/query") != NULL || strstr(path, "/exec") != NULL || strstr(path, "/run") != NULL) {
-            // Default success response for local SQL operations (or fallback to empty set)
             const char* resp = "{\"success\":true,\"ok\":true,\"rows\":[],\"rowCount\":0,\"changes\":0}";
             send_cors_response(client_fd, 200, "OK", "application/json", resp);
         } else {
@@ -99,7 +105,10 @@ static void handle_client(int client_fd) {
 static void* imerek_server_loop(void* arg) {
     (void)arg;
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_fd < 0) return NULL;
+    if (server_fd < 0) {
+        LOGE("Failed to create socket: %s", strerror(errno));
+        return NULL;
+    }
 
     int opt = 1;
     setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
@@ -111,15 +120,18 @@ static void* imerek_server_loop(void* arg) {
     addr.sin_port = htons(SERVER_PORT);
 
     if (bind(server_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        // Port might already be open or busy
+        LOGE("Bind failed on port %d: %s", SERVER_PORT, strerror(errno));
         close(server_fd);
         return NULL;
     }
 
     if (listen(server_fd, 32) < 0) {
+        LOGE("Listen failed: %s", strerror(errno));
         close(server_fd);
         return NULL;
     }
+
+    LOGI("Zenith Imerek Built-in UYAP Server is active and listening on 127.0.0.1:%d", SERVER_PORT);
 
     while (1) {
         struct sockaddr_in client_addr;
@@ -132,9 +144,10 @@ static void* imerek_server_loop(void* arg) {
     return NULL;
 }
 
-// Automatically runs when the shared library is loaded by Android runtime!
+// Automatically runs when libimerek.so is loaded by Android runtime!
 __attribute__((constructor))
 static void start_imerek_builtin_daemon(void) {
+    LOGI("Initializing Zenith Imerek UYAP Native Bridge Daemon...");
     pthread_t thread;
     pthread_create(&thread, NULL, imerek_server_loop, NULL);
     pthread_detach(thread);
