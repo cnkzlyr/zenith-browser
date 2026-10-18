@@ -1,0 +1,37 @@
+--- a/build/config/features.gni
++++ b/build/config/features.gni
+@@ -28,7 +28,8 @@
+   # Zenith Browser: Enable desktop extensions on Android!
+-  enable_extensions = !is_android && !is_ios && !is_castos
++  # Original: enable_extensions = !is_android && !is_ios && !is_castos
++  enable_extensions = !is_ios && !is_castos
+ 
+   # Enable extension APIs and WebUI extensions manager
+   enable_extensions_core = enable_extensions
+--- a/chrome/browser/extensions/extension_service.cc
++++ b/chrome/browser/extensions/extension_service.cc
+@@ -245,6 +245,13 @@ void ExtensionService::Init() {
+   DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
+   TRACE_EVENT0("browser,startup", "ExtensionService::Init");
+ 
++#if BUILDFLAG(IS_ANDROID)
++  // Zenith Android Extension Subsystem Initialization
++  LOG(INFO) << "[Zenith] Initializing Android Extension Subsystem...";
++  component_loader_->AddDefaultComponentExtensions(false);
++#endif
++
+   // Load all installed unpacked and packed extensions from local storage
+   profile_tracker_->StartTracking();
+   ready_->Signal();
+--- a/chrome/browser/extensions/api/webstore_private/webstore_private_api.cc
++++ b/chrome/browser/extensions/api/webstore_private/webstore_private_api.cc
+@@ -89,6 +89,11 @@ ExtensionFunction::ResponseAction WebstorePrivateBeginInstallWithManifest3Funct
+   net::URLRequestContext* context = browser_context()->GetRequestContext();
+   
++#if BUILDFLAG(IS_ANDROID)
++  // Bypass mobile user-agent check on Chrome Web Store
++  params->authuser = "0";
++#endif
++
+   return RespondNow(NoArguments());
+ }

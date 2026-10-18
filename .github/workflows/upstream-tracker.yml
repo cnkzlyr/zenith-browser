@@ -1,0 +1,47 @@
+name: Upstream Chromium Version Tracker
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Runs every 6 hours
+  workflow_dispatch:
+
+jobs:
+  check-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Check Chromium Dash for New Stable Release
+        id: check
+        run: |
+          LATEST_CHROMIUM=$(curl -s "https://chromiumdash.appspot.com/fetch_releases?channel=Stable&platform=All&num=1" | jq -r '.[0].version')
+          echo "Latest Upstream Chromium: $LATEST_CHROMIUM"
+          
+          CURRENT_TRACKED="unknown"
+          if [ -f .upstream-version ]; then
+            CURRENT_TRACKED=$(cat .upstream-version)
+          fi
+          echo "Currently Tracked Version: $CURRENT_TRACKED"
+          
+          if [ "$LATEST_CHROMIUM" != "$CURRENT_TRACKED" ]; then
+            echo "NEW_VERSION_FOUND=true" >> $GITHUB_ENV
+            echo "VERSION=$LATEST_CHROMIUM" >> $GITHUB_ENV
+            echo "$LATEST_CHROMIUM" > .upstream-version
+          else
+            echo "NEW_VERSION_FOUND=false" >> $GITHUB_ENV
+          fi
+
+      - name: Commit Updated Version & Trigger Build
+        if: env.NEW_VERSION_FOUND == 'true'
+        run: |
+          git config --global user.name "Zenith Bot"
+          git config --global user.email "bot@zenithbrowser.org"
+          git add .upstream-version
+          git commit -m "chore(upstream): update tracked Chromium version to ${{ env.VERSION }}"
+          git push
+          
+          # Trigger Nightly Build
+          gh workflow run nightly-build.yml -f chromium_version="${{ env.VERSION }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

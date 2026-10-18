@@ -1,0 +1,20 @@
+--- a/chrome/common/chrome_version.h.in
++++ b/chrome/common/chrome_version.h.in
+@@ -10,7 +10,7 @@
+ #define PRODUCT_NAME "@PRODUCT_FULLNAME@"
+ #define PRODUCT_VERSION "@MAJOR@.@MINOR@.@BUILD@.@PATCH@"
+ #define LAST_CHANGE "@LASTCHANGE@"
+-#define COMPANY_NAME "Google LLC"
++#define COMPANY_NAME "Zenith Browser Project"
+ 
+ #endif  // CHROME_COMMON_CHROME_VERSION_H_IN_
+--- a/components/metrics/metrics_service.cc
++++ b/components/metrics/metrics_service.cc
+@@ -210,6 +210,9 @@ void MetricsService::Start() {
+   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  // Zenith Browser: Disable Google telemetry and tracking
++  state_ = STOPPED;
++  return;
+ 
+   if (state_ != INITIALIZED)
+     return;

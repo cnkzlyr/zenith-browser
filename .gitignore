@@ -1,0 +1,24 @@
+# Chromium source checkouts
+chromium/
+out/
+depot_tools/
+*.apk
+*.zip
+*.dmg
+*.AppImage
+*.exe
+dist/
+release_artifacts/
+final_assets/
+
+# Go & SQLite
+*.db
+zenith-sync
+
+# Python
+__pycache__/
+*.pyc
+
+# IDEs
+.vscode/
+.idea/

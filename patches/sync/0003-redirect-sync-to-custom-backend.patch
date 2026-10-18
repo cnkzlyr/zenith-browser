@@ -1,0 +1,12 @@
+--- a/components/sync/base/sync_base_switches.cc
++++ b/components/sync/base/sync_base_switches.cc
+@@ -24,8 +24,10 @@ namespace switches {
+ 
+ // Zenith Sync Relay endpoint redirection
+ const char kSyncServiceURL[] = "sync-url";
+-const char kDefaultSyncServiceURL[] = "https://clients4.google.com/chrome-sync/command/";
++// Original: Google Private Sync URL
++// Zenith Replacement: Decentralized E2EE Relay
++const char kDefaultSyncServiceURL[] = "https://sync.zenithbrowser.org/api/sync";
+ 
+ const char kSyncShortInitialRetryOverride[] = "sync-short-initial-retry-override";
