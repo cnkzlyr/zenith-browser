@@ -19,6 +19,6 @@ zenith-sync
 __pycache__/
 *.pyc
 
-# IDEs
-.vscode/
-.idea/
+# Android Keystore
+*.keystore
+*.jks

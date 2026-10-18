@@ -60,6 +60,13 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install Android Packaging Tools
+        if: matrix.platform == 'android'
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y aapt zipalign apksigner
+          pip install pillow
+
       - name: Package Platform Artifacts
         run: |
           python3 scripts/package_release.py --platform ${{ matrix.platform }} --out dist

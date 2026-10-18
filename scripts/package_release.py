@@ -74,11 +74,21 @@ def package_android(build_num, out_dir):
                     download_url = a["browser_download_url"]
                     break
         if download_url:
-            download_file(download_url, apk_out)
-            print(f"[SUCCESS] Packaged Zenith Android (Extensions & Adblock enabled): {apk_out} ({os.path.getsize(apk_out)} bytes)")
+            raw_tmp = os.path.join(out_dir, "raw_engine.apk")
+            download_file(download_url, raw_tmp)
+            print("[*] Applying Zenith branding, custom icons and adaptive vectors...")
+            try:
+                from rebrand_apk import rebrand_apk
+            except ImportError:
+                sys.path.append(os.path.dirname(__file__))
+                from rebrand_apk import rebrand_apk
+            rebrand_apk(raw_tmp, apk_out)
+            if os.path.exists(raw_tmp):
+                os.remove(raw_tmp)
+            print(f"[SUCCESS] Packaged Zenith Android (Branded, Extensions & Adblock enabled): {apk_out} ({os.path.getsize(apk_out)} bytes)")
             return apk_out
     except Exception as e:
-        print(f"[WARN] Failed to fetch extension engine ({e}), falling back to snapshot...")
+        print(f"[WARN] Failed to fetch or rebrand extension engine ({e}), falling back to snapshot...")
 
     prefix, zip_name = PLATFORM_MAP["android"]
     zip_url = f"{SNAPSHOT_BASE}/{prefix}%2F{build_num}%2F{zip_name}?alt=media"
