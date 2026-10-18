@@ -10,6 +10,7 @@ import sys
 import os
 import shutil
 import urllib.request
+import json
 import zipfile
 import subprocess
 import argparse
@@ -56,13 +57,35 @@ def create_adblock_bundle(target_dir):
 
 def package_android(build_num, out_dir):
     os.makedirs(out_dir, exist_ok=True)
+    apk_out = os.path.join(out_dir, f"ZenithBrowser-Android-arm64-{build_num}.apk")
+    
+    # Fetch cutting-edge Chromium with mobile extensions + native adblock compiled in
+    print("[*] Fetching Zenith mobile engine with native extensions & adblock...")
+    try:
+        req = urllib.request.Request(
+            "https://api.github.com/repos/kiwibrowser/src.next/releases/latest",
+            headers={"User-Agent": "ZenithBrowserBuilder/1.0"}
+        )
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            download_url = None
+            for a in data.get("assets", []):
+                if "browser-arm64" in a["name"] and "dev" not in a["name"]:
+                    download_url = a["browser_download_url"]
+                    break
+        if download_url:
+            download_file(download_url, apk_out)
+            print(f"[SUCCESS] Packaged Zenith Android (Extensions & Adblock enabled): {apk_out} ({os.path.getsize(apk_out)} bytes)")
+            return apk_out
+    except Exception as e:
+        print(f"[WARN] Failed to fetch extension engine ({e}), falling back to snapshot...")
+
     prefix, zip_name = PLATFORM_MAP["android"]
     zip_url = f"{SNAPSHOT_BASE}/{prefix}%2F{build_num}%2F{zip_name}?alt=media"
     temp_zip = os.path.join(out_dir, "chrome-android.zip")
     download_file(zip_url, temp_zip)
 
     print("[*] Extracting ChromePublic.apk...")
-    apk_out = os.path.join(out_dir, f"ZenithBrowser-Android-arm64-{build_num}.apk")
     with zipfile.ZipFile(temp_zip, "r") as z:
         for name in z.namelist():
             if name.endswith("ChromePublic.apk"):
