@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Zenith Browser - Android Branding & Resource Injection Engine
-Injects custom Zenith Browser branding, adaptive vector icons, 
-and application strings into the upstream mobile extension engine.
+Zenith Browser - Full Android Branding, In-App Graphics & Built-in Imerek UYAP Engine
+- Replaces all Kiwi logos, birds, and names with high-tech Zenith branding.
+- Injects embedded native C server (libimerek.so) on port 9936 into libchrome.so.
+- Produces clean, pure Chromium look with zero Kiwi traces.
 """
 
 import os
@@ -11,7 +12,7 @@ import math
 import shutil
 import zipfile
 import subprocess
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 def render_zenith_icon(size, is_round=False):
     """Renders a high-tech cosmic Zenith 'Z' browser icon."""
@@ -26,15 +27,15 @@ def render_zenith_icon(size, is_round=False):
     draw.ellipse(bg_box, fill=(10, 15, 26, 255))
     
     # Subtle depth rings
-    for i in range(8):
+    for i in range(max(1, int(size * 0.05))):
         step_r = r - (i * (size * 0.02))
         alpha = int(25 + i * 15)
         box = [center - step_r, center - step_r, center + step_r, center + step_r]
-        draw.ellipse(box, outline=(18, 30, 52, alpha), width=max(1, int(size * 0.01)))
+        draw.ellipse(box, outline=(18, 30, 52, min(255, alpha)), width=max(1, int(size * 0.01)))
 
     # Outer neon cyan ring
     draw.ellipse([center - r*0.92, center - r*0.92, center + r*0.92, center + r*0.92], 
-                 outline=(0, 242, 254, 220), width=max(2, int(size * 0.025)))
+                 outline=(0, 242, 254, 220), width=max(1, int(size * 0.025)))
 
     # Modern geometric Zenith "Z"
     scale = size / 108.0
@@ -74,6 +75,34 @@ def render_zenith_icon(size, is_round=False):
         round_img.paste(img, (0, 0), mask=mask)
         return round_img
 
+    return img
+
+def render_zenith_text_logo(width=320, height=80):
+    """Renders the sleek ZENITH typography banner for New Tab Page & About."""
+    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    
+    scale = 56.0 / 108.0
+    def pt(x, y):
+        return (12 + x * scale, 12 + y * scale)
+        
+    draw.polygon([pt(30, 32), pt(78, 32), pt(72, 42), pt(38, 42)], fill=(0, 242, 254, 255))
+    draw.polygon([pt(78, 32), pt(70, 42), pt(36, 76), pt(30, 66)], fill=(56, 189, 248, 255))
+    draw.polygon([pt(30, 66), pt(78, 66), pt(78, 76), pt(30, 76)], fill=(99, 102, 241, 255))
+    
+    font = None
+    for font_path in ["/system/fonts/Roboto-Bold.ttf", "/data/data/com.termux/files/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"]:
+        if os.path.exists(font_path):
+            try:
+                font = ImageFont.truetype(font_path, 40)
+                break
+            except Exception:
+                pass
+                
+    if font:
+        draw.text((80, 16), "ZENITH", fill=(255, 255, 255, 255), font=font)
+    else:
+        draw.text((80, 20), "ZENITH", fill=(255, 255, 255, 255))
     return img
 
 def compile_vector_drawables(work_dir):
@@ -171,25 +200,37 @@ def patch_resources_arsc(arsc_data):
         new_text = b"Zenith\x00" + b"\x00" * 6
         arsc[pos + 2 : pos + 15] = new_text
     else:
-        print("[!] Warning: Exact length target not matched in resources.arsc, searching raw string...")
         raw_pos = arsc.find(b"Kiwi Browser")
         if raw_pos != -1:
             arsc[raw_pos : raw_pos + 6] = b"Zenith"
     return bytes(arsc)
 
+def compile_imerek_so(work_dir):
+    """Compiles the lightweight native embedded Imerek UYAP server."""
+    src_c = os.path.join(os.path.dirname(__file__), "imerek_server.c")
+    out_so = os.path.join(work_dir, "libimerek.so")
+    subprocess.check_call([
+        "clang", "-shared", "-fPIC", "-O2",
+        src_c, "-o", out_so, "-llog"
+    ])
+    subprocess.check_call(["strip", out_so])
+    return out_so
+
 def rebrand_apk(input_apk, output_apk, keystore_path="zenith.keystore"):
     print(f"\n=======================================================")
-    print(f" Zenith Browser - Rebranding APK: {input_apk}")
+    print(f" Zenith Browser - Complete Rebrand & Engine Integration")
+    print(f" Source: {input_apk} -> Target: {output_apk}")
     print(f"=======================================================")
     
     work_dir = os.path.join(os.path.dirname(output_apk), "zenith_rebrand_tmp")
     shutil.rmtree(work_dir, ignore_errors=True)
     os.makedirs(work_dir, exist_ok=True)
 
-    print("[*] Compiling Zenith adaptive vector drawables...")
+    print("[*] 1/5 Compiling Zenith adaptive vector drawables...")
     compiled_vectors = compile_vector_drawables(work_dir)
 
-    print("[*] Generating Zenith mipmap raster icons...")
+    print("[*] 2/5 Generating Zenith in-app brand logos & icons...")
+    # 1. Launcher mipmaps
     densities = {
         "mipmap-mdpi-v4": 48,
         "mipmap-hdpi-v4": 72,
@@ -197,7 +238,7 @@ def rebrand_apk(input_apk, output_apk, keystore_path="zenith.keystore"):
         "mipmap-xxhdpi-v4": 144,
         "mipmap-xxxhdpi-v4": 192,
     }
-    rendered_mipmaps = {}
+    rendered_assets = {}
     for folder, px in densities.items():
         reg_img = render_zenith_icon(px, is_round=False)
         rnd_img = render_zenith_icon(px, is_round=True)
@@ -206,15 +247,78 @@ def rebrand_apk(input_apk, output_apk, keystore_path="zenith.keystore"):
         reg_img.save(reg_path, format="WEBP", lossless=True)
         rnd_img.save(rnd_path, format="WEBP", lossless=True)
         with open(reg_path, "rb") as f:
-            rendered_mipmaps[f"res/{folder}/ic_launcher"] = f.read()
+            rendered_assets[f"res/{folder}/ic_launcher"] = f.read()
         with open(rnd_path, "rb") as f:
-            rendered_mipmaps[f"res/{folder}/ic_launcher_round"] = f.read()
+            rendered_assets[f"res/{folder}/ic_launcher_round"] = f.read()
 
+    # 2. In-app logos (replace all Kiwi birds & logos)
+    # chromelogo16 (tablet tab & title bar icon)
+    for px, folders in [(16, ["res/drawable/chromelogo16", "res/drawable-hdpi-v4/chromelogo16"]),
+                        (24, ["res/drawable-xhdpi-v4/chromelogo16"]),
+                        (32, ["res/drawable-xxhdpi-v4/chromelogo16"])]:
+        icon_img = render_zenith_icon(px, is_round=False)
+        p = os.path.join(work_dir, f"chromelogo_{px}.webp")
+        icon_img.save(p, format="WEBP", lossless=True)
+        with open(p, "rb") as f:
+            data = f.read()
+        for fld in folders:
+            rendered_assets[fld] = data
+
+    # ic_chrome & infobar_chrome
+    for px, folders in [(24, ["res/drawable/ic_chrome", "res/drawable-hdpi-v4/ic_chrome", "res/drawable/infobar_chrome", "res/drawable-hdpi-v4/infobar_chrome"]),
+                        (36, ["res/drawable-xhdpi-v4/ic_chrome", "res/drawable-xhdpi-v4/infobar_chrome"]),
+                        (48, ["res/drawable-xxhdpi-v4/ic_chrome", "res/drawable-xxhdpi-v4/infobar_chrome"])]:
+        icon_img = render_zenith_icon(px, is_round=False)
+        p = os.path.join(work_dir, f"ic_chrome_{px}.webp")
+        icon_img.save(p, format="WEBP", lossless=True)
+        with open(p, "rb") as f:
+            data = f.read()
+        for fld in folders:
+            rendered_assets[fld] = data
+
+    # fre_product_logo (NTP main splash logo)
+    fre_img = render_zenith_icon(192, is_round=False)
+    fre_p = os.path.join(work_dir, "fre_product_logo.webp")
+    fre_img.save(fre_p, format="WEBP", lossless=True)
+    with open(fre_p, "rb") as f:
+        fre_data = f.read()
+    for fld in ["res/drawable/fre_product_logo", "res/drawable-hdpi-v4/fre_product_logo", 
+                "res/drawable-xhdpi-v4/fre_product_logo", "res/drawable-xxhdpi-v4/fre_product_logo"]:
+        rendered_assets[fld] = fre_data
+
+    # product_logo_name (NTP name banner)
+    banner_img = render_zenith_text_logo(320, 80)
+    banner_p = os.path.join(work_dir, "product_logo_name.webp")
+    banner_img.save(banner_p, format="WEBP", lossless=True)
+    with open(banner_p, "rb") as f:
+        banner_data = f.read()
+    for fld in ["res/drawable/product_logo_name", "res/drawable-hdpi-v4/product_logo_name",
+                "res/drawable-xhdpi-v4/product_logo_name", "res/drawable-xxhdpi-v4/product_logo_name"]:
+        rendered_assets[fld] = banner_data
+
+    # 3. Built-in Imerek UYAP Native Server Injection
+    print("[*] 3/5 Compiling & linking Built-in Imerek UYAP Server (libimerek.so)...")
+    libimerek_path = compile_imerek_so(work_dir)
+    with open(libimerek_path, "rb") as f:
+        libimerek_data = f.read()
+
+    # Extract libchrome.so to add DT_NEEDED dependency
+    print("[*] 4/5 Patching libchrome.so to auto-launch Imerek Server on startup...")
+    temp_libchrome = os.path.join(work_dir, "libchrome.so")
+    with zipfile.ZipFile(input_apk, "r") as z:
+        with z.open("lib/arm64-v8a/libchrome.so") as so, open(temp_libchrome, "wb") as out:
+            shutil.copyfileobj(so, out)
+            
+    subprocess.check_call(["patchelf", "--add-needed", "libimerek.so", temp_libchrome])
+    with open(temp_libchrome, "rb") as f:
+        patched_libchrome = f.read()
+
+    # 4. Repackage APK
+    print("[*] 5/5 Repackaging and signing Zenith APK...")
     unaligned_apk = os.path.join(work_dir, "unaligned.apk")
-    print(f"[*] Repackaging APK to {unaligned_apk}...")
     with zipfile.ZipFile(input_apk, "r") as src, zipfile.ZipFile(unaligned_apk, "w", compression=zipfile.ZIP_DEFLATED) as dst:
         for item in src.infolist():
-            # Strip old Kiwi signature
+            # Strip old Kiwi signatures
             if item.filename.startswith("META-INF/") and any(item.filename.endswith(ext) for ext in [".SF", ".RSA", ".DSA", ".MF"]):
                 continue
             
@@ -222,23 +326,30 @@ def rebrand_apk(input_apk, output_apk, keystore_path="zenith.keystore"):
             if item.filename == "resources.arsc":
                 data = patch_resources_arsc(src.read(item.filename))
                 dst.writestr(item, data)
-            # Replace adaptive vector drawables
+            # Inject adaptive vectors
             elif item.filename in compiled_vectors:
-                print(f"[+] Injected vector: {item.filename}")
                 dst.writestr(item, compiled_vectors[item.filename])
-            # Replace bitmap mipmaps
-            elif item.filename in rendered_mipmaps:
-                print(f"[+] Injected mipmap: {item.filename}")
-                dst.writestr(item, rendered_mipmaps[item.filename])
-            # Clear Kiwi gradient parts
+            # Inject rendered brand assets
+            elif item.filename in rendered_assets:
+                dst.writestr(item, rendered_assets[item.filename])
+            # Inject patched libchrome.so
+            elif item.filename == "lib/arm64-v8a/libchrome.so":
+                print("[+] Injected patched libchrome.so with libimerek.so dependency")
+                dst.writestr(item, patched_libchrome)
+            # Clear Kiwi bird gradient parts
             elif item.filename in ["res/drawable/$ic_launcher_background__0.xml",
                                    "res/drawable/$ic_launcher_foreground__0.xml",
                                    "res/drawable/$ic_launcher_foreground__1.xml"]:
-                # Empty dummy vector to preserve resource indices without loading Kiwi graphics
                 dummy_xml = b'<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="1dp" android:height="1dp" android:viewportWidth="1" android:viewportHeight="1"/>'
                 dst.writestr(item, dummy_xml)
             else:
                 dst.writestr(item, src.read(item.filename))
+
+        # Add libimerek.so into APK
+        imerek_entry = zipfile.ZipInfo("lib/arm64-v8a/libimerek.so")
+        imerek_entry.compress_type = zipfile.ZIP_DEFLATED
+        dst.writestr(imerek_entry, libimerek_data)
+        print("[+] Embedded lib/arm64-v8a/libimerek.so directly into APK")
 
     aligned_apk = os.path.join(work_dir, "aligned.apk")
     print(f"[*] Running zipalign on package...")
@@ -270,11 +381,10 @@ def rebrand_apk(input_apk, output_apk, keystore_path="zenith.keystore"):
     print(f"[*] Verifying final signature...")
     subprocess.check_call(["apksigner", "verify", "--verbose", output_apk])
 
-    # Clean up
     shutil.rmtree(work_dir, ignore_errors=True)
-    print(f"\n[SUCCESS] Successfully built branded Zenith APK: {output_apk} ({os.path.getsize(output_apk)} bytes)")
+    print(f"\n[SUCCESS] Successfully built Zenith APK with Built-in UYAP Server: {output_apk} ({os.path.getsize(output_apk)} bytes)")
 
 if __name__ == "__main__":
-    src_apk = sys.argv[1] if len(sys.argv) > 1 else "kiwi_next_arm64.apk"
-    dst_apk = sys.argv[2] if len(sys.argv) > 2 else "ZenithBrowser-Android-arm64.apk"
+    src_apk = sys.argv[1] if len(sys.argv) > 1 else "/sdcard/Download/com.kiwibrowser.browser-arm64-14310011181-github.apk"
+    dst_apk = sys.argv[2] if len(sys.argv) > 2 else "/sdcard/Download/ZenithBrowser-Android-arm64.apk"
     rebrand_apk(src_apk, dst_apk)
