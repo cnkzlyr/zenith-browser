@@ -15,7 +15,11 @@ jobs:
       - name: Check Chromium Dash for New Stable Release
         id: check
         run: |
-          LATEST_CHROMIUM=$(curl -s "https://chromiumdash.appspot.com/fetch_releases?channel=Stable&platform=All&num=1" | jq -r '.[0].version')
+          LATEST_CHROMIUM=$(curl -s "https://chromiumdash.appspot.com/fetch_releases?channel=Stable&platform=Linux&num=1" | jq -r '.[0].version 2>/dev/null' || true)
+          if [ -z "$LATEST_CHROMIUM" ] || [ "$LATEST_CHROMIUM" = "null" ]; then
+            echo "API fetch failed, skipping update check"
+            exit 0
+          fi
           echo "Latest Upstream Chromium: $LATEST_CHROMIUM"
           
           CURRENT_TRACKED="unknown"

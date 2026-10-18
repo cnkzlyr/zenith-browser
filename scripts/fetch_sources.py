@@ -12,7 +12,7 @@ import urllib.request
 import subprocess
 import argparse
 
-CHROMIUM_DASH_API = "https://chromiumdash.appspot.com/fetch_releases?channel=Stable&platform=All&num=1"
+CHROMIUM_DASH_API = "https://chromiumdash.appspot.com/fetch_releases?channel=Stable&platform=Linux&num=1"
 
 def get_latest_stable_version():
     print("[*] Querying ChromiumDash API for latest stable tag...")
